@@ -1343,7 +1343,7 @@ static av_cold int vaapi_encode_create_recon_frames(AVCodecContext *avctx)
     ctx->recon_frames->height    = ctx->surface_height;
     // At most three IDR/I/P frames and two runs of B frames can be in
     // flight at any one time.
-    ctx->recon_frames->initial_pool_size = 3 + 2 * avctx->max_b_frames;
+    ctx->recon_frames->initial_pool_size = 0;
 
     err = av_hwframe_ctx_init(ctx->recon_frames_ref);
     if (err < 0) {
@@ -1523,7 +1523,7 @@ av_cold int ff_vaapi_encode_init(AVCodecContext *avctx)
 
     // This should be configurable somehow.  (Needs testing on a machine
     // where it actually overlaps properly, though.)
-    ctx->issue_mode = ISSUE_MODE_MAXIMISE_THROUGHPUT;
+    ctx->issue_mode = ISSUE_MODE_SERIALISE_EVERYTHING;
 
     if (ctx->va_packed_headers & VA_ENC_PACKED_HEADER_SEQUENCE &&
         ctx->codec->write_sequence_header) {

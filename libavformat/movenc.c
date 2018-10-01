@@ -5572,38 +5572,6 @@ static int mov_write_packet(AVFormatContext *s, AVPacket *pkt)
         if (!pkt->size)
             return mov_write_single_packet(s, pkt); /* Passthrough. */
 
-        /*
-         * Subtitles require special handling.
-         *
-         * 1) For full complaince, every track must have a sample at
-         * dts == 0, which is rarely true for subtitles. So, as soon
-         * as we see any packet with dts > 0, write an empty subtitle
-         * at dts == 0 for any subtitle track with no samples in it.
-         *
-         * 2) For each subtitle track, check if the current packet's
-         * dts is past the duration of the last subtitle sample. If
-         * so, we now need to write an end sample for that subtitle.
-         *
-         * This must be done conditionally to allow for subtitles that
-         * immediately replace each other, in which case an end sample
-         * is not needed, and is, in fact, actively harmful.
-         *
-         * 3) See mov_write_trailer for how the final end sample is
-         * handled.
-         */
-        for (i = 0; i < mov->nb_streams; i++) {
-            MOVTrack *trk = &mov->tracks[i];
-            int ret;
-
-            if (trk->par->codec_id == AV_CODEC_ID_MOV_TEXT &&
-                trk->track_duration < pkt->dts &&
-                (trk->entry == 0 || !trk->last_sample_is_subtitle_end)) {
-                ret = mov_write_subtitle_end_packet(s, i, trk->track_duration);
-                if (ret < 0) return ret;
-                trk->last_sample_is_subtitle_end = 1;
-            }
-        }
-
         if (trk->mode == MODE_MOV && trk->par->codec_type == AVMEDIA_TYPE_VIDEO) {
             AVPacket *opkt = pkt;
             int reshuffle_ret, ret;
@@ -6556,7 +6524,7 @@ static int mov_write_trailer(AVFormatContext *s)
         MOVTrack *trk = &mov->tracks[i];
         if (trk->par->codec_id == AV_CODEC_ID_MOV_TEXT &&
             !trk->last_sample_is_subtitle_end) {
-            mov_write_subtitle_end_packet(s, i, trk->track_duration);
+            mov_write_subtitle_end_packet(s, i, trk->start_dts + trk->track_duration);
             trk->last_sample_is_subtitle_end = 1;
         }
     }

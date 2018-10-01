@@ -6277,13 +6277,13 @@ test_cpp <<EOF && enable uwp && d3d11va_extralibs="-ldxgi -ld3d11"
 EOF
 
 enabled vaapi &&
-    check_lib vaapi va/va.h vaInitialize -lva
+    check_lib vaapi va/va.h vaInitialize -lva -ldl
 
 enabled vaapi &&
     check_cc vaapi "va/va.h" "vaCreateSurfaces(0, 0, 0, 0, 0, 0, 0, 0)"
 
 if enabled vaapi; then
-    check_lib vaapi_drm "va/va.h va/va_drm.h" vaGetDisplayDRM -lva -lva-drm
+    check_lib vaapi_drm "va/va.h va/va_drm.h" vaGetDisplayDRM -lva -lva-drm -lva -ldrm -ldl -lm
     check_lib vaapi_x11 "va/va.h va/va_x11.h" vaGetDisplay -lva -lva-x11 -lX11
 fi
 

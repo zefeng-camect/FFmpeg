@@ -241,7 +241,7 @@ static int get_video_buffer(AVFrame *frame, int align)
         if (i == 1 || i == 2)
             h = AV_CEIL_RSHIFT(h, desc->log2_chroma_h);
 
-        frame->buf[i] = av_buffer_alloc(frame->linesize[i] * h + 16 + 16/*STRIDE_ALIGN*/ - 1);
+        frame->buf[i] = av_buffer_allocz(frame->linesize[i] * h + 16 + 16/*STRIDE_ALIGN*/ - 1);
         if (!frame->buf[i])
             goto fail;
 
@@ -249,7 +249,7 @@ static int get_video_buffer(AVFrame *frame, int align)
     }
     if (desc->flags & AV_PIX_FMT_FLAG_PAL || desc->flags & FF_PSEUDOPAL) {
         av_buffer_unref(&frame->buf[1]);
-        frame->buf[1] = av_buffer_alloc(AVPALETTE_SIZE);
+        frame->buf[1] = av_buffer_allocz(AVPALETTE_SIZE);
         if (!frame->buf[1])
             goto fail;
         frame->data[1] = frame->buf[1]->data;
@@ -300,7 +300,7 @@ static int get_audio_buffer(AVFrame *frame, int align)
         frame->extended_data = frame->data;
 
     for (i = 0; i < FFMIN(planes, AV_NUM_DATA_POINTERS); i++) {
-        frame->buf[i] = av_buffer_alloc(frame->linesize[0]);
+        frame->buf[i] = av_buffer_allocz(frame->linesize[0]);
         if (!frame->buf[i]) {
             av_frame_unref(frame);
             return AVERROR(ENOMEM);
@@ -308,7 +308,7 @@ static int get_audio_buffer(AVFrame *frame, int align)
         frame->extended_data[i] = frame->data[i] = frame->buf[i]->data;
     }
     for (i = 0; i < planes - AV_NUM_DATA_POINTERS; i++) {
-        frame->extended_buf[i] = av_buffer_alloc(frame->linesize[0]);
+        frame->extended_buf[i] = av_buffer_allocz(frame->linesize[0]);
         if (!frame->extended_buf[i]) {
             av_frame_unref(frame);
             return AVERROR(ENOMEM);
@@ -722,7 +722,7 @@ AVFrameSideData *av_frame_new_side_data(AVFrame *frame,
                                         int size)
 {
     AVFrameSideData *ret;
-    AVBufferRef *buf = av_buffer_alloc(size);
+    AVBufferRef *buf = av_buffer_allocz(size);
     ret = av_frame_new_side_data_from_buf(frame, type, buf);
     if (!ret)
         av_buffer_unref(&buf);

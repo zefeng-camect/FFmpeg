@@ -23,6 +23,8 @@
 #include <mfx/mfxjpeg.h>
 
 #include <stdio.h>
+#define __USE_GNU
+#include <stdlib.h>
 #include <string.h>
 
 #include "libavutil/avstring.h"
@@ -279,6 +281,7 @@ int ff_qsv_init_internal_session(AVCodecContext *avctx, mfxSession *session,
     const char *desc;
     int ret;
 
+    // TODO: Need to set driver name to iHD somehow.
     ret = MFXInit(impl, &ver, session);
     if (ret < 0)
         return ff_qsv_print_error(avctx, ret,
@@ -605,6 +608,7 @@ int ff_qsv_init_session_device(AVCodecContext *avctx, mfxSession *psession,
                "from the session\n");
     }
 
+    // TODO: Need to set driver name to iHD somehow.
     err = MFXInit(impl, &ver, &session);
     if (err != MFX_ERR_NONE)
         return ff_qsv_print_error(avctx, err,
