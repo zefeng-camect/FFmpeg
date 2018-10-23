@@ -138,7 +138,7 @@ static int scale_vaapi_filter_frame(AVFilterLink *inlink, AVFrame *input_frame)
     } else {
         params.output_region = NULL;
     }
-    params.output_background_color = 0xff000000;
+    params.output_background_color = 0xff00ff00;
     params.output_color_standard = params.surface_color_standard;
 
     params.pipeline_flags = 0;
@@ -149,6 +149,10 @@ static int scale_vaapi_filter_frame(AVFilterLink *inlink, AVFrame *input_frame)
         goto fail;
 
     err = av_frame_copy_props(output_frame, input_frame);
+    output_frame->crop_left = 0;
+    output_frame->crop_top = 0;
+    output_frame->crop_right = 0;
+    output_frame->crop_bottom = 0;
     if (err < 0)
         goto fail;
 
