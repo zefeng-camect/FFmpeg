@@ -293,6 +293,25 @@ static char* mpjpeg_get_boundary(AVIOContext* pb)
     return res;
 }
 
+static int shrink_buffer(AVIOContext *pb) {
+    const int data_len =  pb->buf_end - pb->buf_ptr;
+    const int new_buffer_size = (data_len > pb->orig_buffer_size ? data_len : pb->orig_buffer_size);
+    uint8_t *orig_buffer = pb->buffer;
+    uint8_t *new_buffer = NULL;
+
+    if (pb->buffer_size == pb->orig_buffer_size) return 0;
+
+    new_buffer = av_malloc(new_buffer_size);
+    if (!new_buffer) return AVERROR(ENOMEM);
+    memcpy(new_buffer, pb->buf_ptr, data_len);
+
+    pb->buffer = pb->buf_ptr = new_buffer;
+    pb->buffer_size = new_buffer_size;
+    pb->buf_end = pb->buffer + data_len;
+
+    av_free(orig_buffer);
+    return 0;
+}
 
 static int mpjpeg_read_packet(AVFormatContext *s, AVPacket *pkt)
 {
@@ -333,7 +352,9 @@ static int mpjpeg_read_packet(AVFormatContext *s, AVPacket *pkt)
         /* no size was given -- we read until the next boundary or end-of-file */
         int remaining = 0, len;
 
-        const int read_chunk = 2048;
+        // Use a large read chunk to avoid wasteful recopies as the buffer grows. This should
+        // be enough to hold an average VGA frame.
+        const int read_chunk = 64 * 1024 ;
         av_init_packet(pkt);
         pkt->data = NULL;
         pkt->size = 0;
@@ -351,7 +372,13 @@ static int mpjpeg_read_packet(AVFormatContext *s, AVPacket *pkt)
             do {
                 if (!memcmp(start, mpjpeg->searchstr, mpjpeg->searchstr_len)) {
                     // got the boundary! rewind the stream
-                    avio_seek(s->pb, -len, SEEK_CUR);
+                    int rc = avio_seek(s->pb, -len, SEEK_CUR);
+                    if (rc < 0)
+                        av_log(s, AV_LOG_ERROR, "rc = %d(%s), len = %d\n", rc, av_err2str(rc), len);
+                    // ffio_ensure_seekback always adds at least an extra packet worth of space
+                    // beyond what is requested, so a read after using it will never allow the
+                    // buffer to shrink. Shrink it now to prevent unbounded growth.
+                    shrink_buffer(s->pb);
                     pkt->size -= len;
                     return pkt->size;
                 }
@@ -359,6 +386,7 @@ static int mpjpeg_read_packet(AVFormatContext *s, AVPacket *pkt)
                 start++;
             } while (len >= mpjpeg->searchstr_len);
             remaining = len;
+            ffio_ensure_seekback(s->pb, read_chunk);
         }
 
         /* error or EOF occurred */

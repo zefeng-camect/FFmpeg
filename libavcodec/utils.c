@@ -995,11 +995,6 @@ FF_ENABLE_DEPRECATION_WARNINGS
                 }
             }
         }
-
-#if FF_API_AVCTX_TIMEBASE
-        if (avctx->framerate.num > 0 && avctx->framerate.den > 0)
-            avctx->time_base = av_inv_q(av_mul_q(avctx->framerate, (AVRational){avctx->ticks_per_frame, 1}));
-#endif
     }
     if (codec->priv_data_size > 0 && avctx->priv_data && codec->priv_class) {
         av_assert0(*(const AVClass **)avctx->priv_data == codec->priv_class);
@@ -1397,13 +1392,6 @@ const char *avcodec_profile_name(enum AVCodecID codec_id, int profile)
 
 unsigned avcodec_version(void)
 {
-//    av_assert0(AV_CODEC_ID_V410==164);
-    av_assert0(AV_CODEC_ID_PCM_S8_PLANAR==65563);
-    av_assert0(AV_CODEC_ID_ADPCM_G722==69660);
-//     av_assert0(AV_CODEC_ID_BMV_AUDIO==86071);
-    av_assert0(AV_CODEC_ID_SRT==94216);
-    av_assert0(LIBAVCODEC_VERSION_MICRO >= 100);
-
     return LIBAVCODEC_VERSION_INT;
 }
 
