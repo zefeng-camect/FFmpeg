@@ -112,6 +112,10 @@ static int scale_vaapi_filter_frame(AVFilterLink *inlink, AVFrame *input_frame)
         .height = input_frame->height -
                  (input_frame->crop_top + input_frame->crop_bottom),
     };
+    input_frame->crop_left = 0;
+    input_frame->crop_right = 0;
+    input_frame->crop_top = 0;
+    input_frame->crop_bottom = 0;
 
     params.surface = input_surface;
     params.surface_region = &input_region;
