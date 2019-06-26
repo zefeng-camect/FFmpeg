@@ -19,6 +19,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#define _GNU_SOURCE
+#include <string.h>
+
 #include "libavutil/avstring.h"
 #include "libavutil/opt.h"
 
@@ -350,44 +353,44 @@ static int mpjpeg_read_packet(AVFormatContext *s, AVPacket *pkt)
         ret = av_get_packet(s->pb, pkt, size);
     } else {
         /* no size was given -- we read until the next boundary or end-of-file */
-        int remaining = 0, len;
+        int remaining = 0;
 
         // Use a large read chunk to avoid wasteful recopies as the buffer grows. This should
         // be enough to hold an average VGA frame.
-        const int read_chunk = 64 * 1024 ;
+        const int read_chunk = 128 * 1024;
+        const int seekable = s->pb->seekable;
         av_init_packet(pkt);
         pkt->data = NULL;
         pkt->size = 0;
         pkt->pos  = avio_tell(s->pb);
 
+        // Some server might not support seek. Disable seek to make sure it always works.
+        s->pb->seekable = 0;
         /* we may need to return as much as all we've read back to the buffer */
         ffio_ensure_seekback(s->pb, read_chunk);
 
         while ((ret = av_append_packet(s->pb, pkt, read_chunk - remaining)) >= 0) {
-            /* scan the new data */
-            char *start;
-
-            len = ret + remaining;
-            start = pkt->data + pkt->size - len;
-            do {
-                if (!memcmp(start, mpjpeg->searchstr, mpjpeg->searchstr_len)) {
-                    // got the boundary! rewind the stream
-                    int rc = avio_seek(s->pb, -len, SEEK_CUR);
-                    if (rc < 0)
-                        av_log(s, AV_LOG_ERROR, "rc = %d(%s), len = %d\n", rc, av_err2str(rc), len);
-                    // ffio_ensure_seekback always adds at least an extra packet worth of space
-                    // beyond what is requested, so a read after using it will never allow the
-                    // buffer to shrink. Shrink it now to prevent unbounded growth.
-                    shrink_buffer(s->pb);
-                    pkt->size -= len;
-                    return pkt->size;
-                }
-                len--;
-                start++;
-            } while (len >= mpjpeg->searchstr_len);
-            remaining = len;
+            int len = ret + remaining;
+            uint8_t* end = memmem(pkt->data + pkt->size - len, len, mpjpeg->searchstr,
+                                  mpjpeg->searchstr_len);
+            if (end) {
+                int rc;
+                len = pkt->data + pkt->size - end;
+                // got the boundary! rewind the stream
+                rc = avio_seek(s->pb, -len, SEEK_CUR);
+                if (rc < 0)
+                    av_log(s, AV_LOG_ERROR, "rc = %d(%s), len = %d\n", rc, av_err2str(rc), len);
+                // ffio_ensure_seekback always adds at least an extra packet worth of space
+                // beyond what is requested, so a read after using it will never allow the
+                // buffer to shrink. Shrink it now to prevent unbounded growth.
+                shrink_buffer(s->pb);
+                pkt->size -= len;
+                return pkt->size;
+            }
+            remaining = mpjpeg->searchstr_len - 1;
             ffio_ensure_seekback(s->pb, read_chunk);
         }
+        s->pb->seekable = seekable;
 
         /* error or EOF occurred */
         if (ret == AVERROR_EOF) {
