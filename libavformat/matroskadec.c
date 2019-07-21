@@ -3535,10 +3535,10 @@ static int matroska_read_packet(AVFormatContext *s, AVPacket *pkt)
 
     while (matroska_deliver_packet(matroska, pkt)) {
         int64_t pos = avio_tell(matroska->ctx->pb);
-        if (matroska->done)
-            return (ret < 0) ? ret : AVERROR_EOF;
         if (matroska_parse_cluster(matroska) < 0)
             ret = matroska_resync(matroska, pos);
+        if (matroska->done)
+            return (ret < 0) ? ret : AVERROR_EOF;
     }
 
     return 0;
