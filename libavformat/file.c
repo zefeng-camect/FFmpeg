@@ -214,7 +214,7 @@ static int file_open(URLContext *h, const char *filename, int flags)
             access |= O_TRUNC;
     } else if (flags & AVIO_FLAG_WRITE) {
         access = O_CREAT | O_WRONLY
-#ifdef _GNU_SOURCE
+#ifdef O_DIRECT
             | O_DIRECT
 #endif
             ;
