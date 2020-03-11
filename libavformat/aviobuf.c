@@ -33,7 +33,7 @@
 #include "url.h"
 #include <stdarg.h>
 
-#define IO_BUFFER_SIZE 32768
+#define IO_BUFFER_SIZE 65536
 
 /**
  * Do seeks within this distance ahead of the current buffer by skipping
@@ -1058,7 +1058,7 @@ int ffio_ensure_seekback(AVIOContext *s, int64_t buf_size)
 
     buf_size += s->buf_ptr - s->buffer + max_buffer_size;
 
-    if (buf_size < filled || s->seekable || !s->read_packet)
+    if (buf_size < s->buffer_size || s->seekable || !s->read_packet)
         return 0;
     av_assert0(!s->write_flag);
 

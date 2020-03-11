@@ -406,35 +406,27 @@ static int filter_frame(AVFilterLink *link, AVFrame *in)
     AVFilterLink *outlink = link->dst->outputs[0];
     AVFrame *out;
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(link->format);
-    char buf[32];
     int in_range;
 
     if (in->colorspace == AVCOL_SPC_YCGCO)
         av_log(link->dst, AV_LOG_WARNING, "Detected unsupported YCgCo colorspace.\n");
 
+    av_frame_apply_cropping(in, 0);
     if(   in->width  != link->w
        || in->height != link->h
        || in->format != link->format
        || in->sample_aspect_ratio.den != link->sample_aspect_ratio.den || in->sample_aspect_ratio.num != link->sample_aspect_ratio.num) {
         int ret;
-
-        if (scale->eval_mode == EVAL_MODE_INIT) {
-            snprintf(buf, sizeof(buf)-1, "%d", outlink->w);
-            av_opt_set(scale, "w", buf, 0);
-            snprintf(buf, sizeof(buf)-1, "%d", outlink->h);
-            av_opt_set(scale, "h", buf, 0);
-        }
-
         link->dst->inputs[0]->format = in->format;
         link->dst->inputs[0]->w      = in->width;
         link->dst->inputs[0]->h      = in->height;
-
         link->dst->inputs[0]->sample_aspect_ratio.den = in->sample_aspect_ratio.den;
         link->dst->inputs[0]->sample_aspect_ratio.num = in->sample_aspect_ratio.num;
 
-
         if ((ret = config_props(outlink)) < 0)
             return ret;
+        link->dst->inputs[0]->w      = link->w;
+        link->dst->inputs[0]->h      = link->h;
     }
 
     if (!scale->sws)

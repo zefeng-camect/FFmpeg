@@ -266,6 +266,8 @@ AVBufferPool *av_buffer_pool_init2(int size, void *opaque,
                                    AVBufferRef* (*alloc)(void *opaque, int size),
                                    void (*pool_free)(void *opaque));
 
+void av_buffer_pool_set_free_list_size(AVBufferPool *pool, int free_list_size);
+
 /**
  * Mark the pool as being available for freeing. It will actually be freed only
  * once all the allocated buffers associated with the pool are released. Thus it

@@ -231,8 +231,9 @@ static int file_open(URLContext *h, const char *filename, int flags)
 
     /* Buffer writes more than the default 32k to improve throughput especially
      * with networked file systems */
-    if (!h->is_streamed && flags & AVIO_FLAG_WRITE)
-        h->min_packet_size = h->max_packet_size = 262144;
+    if (!h->is_streamed && (flags & AVIO_FLAG_WRITE) && !(flags & AVIO_FLAG_DIRECT)) {
+        h->min_packet_size = 262144;
+    }
 
     return 0;
 }
@@ -257,6 +258,7 @@ static int64_t file_seek(URLContext *h, int64_t pos, int whence)
 static int file_close(URLContext *h)
 {
     FileContext *c = h->priv_data;
+    posix_fadvise(c->fd, 0, 0, POSIX_FADV_DONTNEED);
     return close(c->fd);
 }
 
