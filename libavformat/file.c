@@ -222,9 +222,18 @@ static int file_open(URLContext *h, const char *filename, int flags)
 #ifdef O_BINARY
     access |= O_BINARY;
 #endif
+    if (flags & AVIO_FLAG_NONBLOCK) {
+        access |= O_NONBLOCK;
+    }
     fd = avpriv_open(filename, access, 0666);
     if (fd == -1)
         return AVERROR(errno);
+    if (flags & AVIO_FLAG_NONBLOCK) {
+        const int rc = fcntl(fd, F_SETFL, 0);
+        if (rc) {
+            av_log(h, AV_LOG_ERROR, "Failed to remove O_NONBLOCK from '%s': %d\n", filename, rc);
+        }
+    }
     c->fd = fd;
 
     h->is_streamed = !fstat(fd, &st) && S_ISFIFO(st.st_mode);
