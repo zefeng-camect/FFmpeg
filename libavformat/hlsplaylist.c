@@ -36,7 +36,7 @@ void ff_hls_write_playlist_version(AVIOContext *out, int version) {
 }
 
 void ff_hls_write_audio_rendition(AVIOContext *out, char *agroup,
-                                  char *filename, int name_id, int is_default) {
+                                  const char *filename, int name_id, int is_default) {
     if (!out || !agroup || !filename)
         return;
 
@@ -45,9 +45,22 @@ void ff_hls_write_audio_rendition(AVIOContext *out, char *agroup,
                      is_default ? "YES" : "NO", filename);
 }
 
+void ff_hls_write_subtitle_rendition(AVIOContext *out, char *sgroup,
+                                     const char *filename, char *language, int name_id, int is_default) {
+    if (!out || !filename)
+        return;
+
+    avio_printf(out, "#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"%s\"", sgroup);
+    avio_printf(out, ",NAME=\"subtitle_%d\",DEFAULT=%s,", name_id, is_default ? "YES" : "NO");
+    if (language) {
+        avio_printf(out, "LANGUAGE=\"%s\",", language);
+    }
+    avio_printf(out, "URI=\"%s\"\n", filename);
+}
+
 void ff_hls_write_stream_info(AVStream *st, AVIOContext *out,
-                              int bandwidth, char *filename, char *agroup,
-                              char *codecs, char *ccgroup) {
+                              int bandwidth, const char *filename, char *agroup,
+                              char *codecs, char *ccgroup, char* sgroup) {
 
     if (!out || !filename)
         return;
@@ -68,6 +81,8 @@ void ff_hls_write_stream_info(AVStream *st, AVIOContext *out,
         avio_printf(out, ",AUDIO=\"group_%s\"", agroup);
     if (ccgroup && strlen(ccgroup) > 0)
         avio_printf(out, ",CLOSED-CAPTIONS=\"%s\"", ccgroup);
+     if (sgroup && sgroup[0])
+        avio_printf(out, ",SUBTITLES=\"%s\"", sgroup);
     avio_printf(out, "\n%s\n\n", filename);
 }
 
@@ -91,7 +106,7 @@ void ff_hls_write_playlist_header(AVIOContext *out, int version, int allowcache,
     }
 }
 
-void ff_hls_write_init_file(AVIOContext *out, char *filename,
+void ff_hls_write_init_file(AVIOContext *out, const char *filename,
                             int byterange_mode, int64_t size, int64_t pos) {
     avio_printf(out, "#EXT-X-MAP:URI=\"%s\"", filename);
     if (byterange_mode) {
@@ -105,7 +120,7 @@ int ff_hls_write_file_entry(AVIOContext *out, int insert_discont,
                              double duration, int round_duration,
                              int64_t size, int64_t pos, //Used only if HLS_SINGLE_FILE flag is set
                              char *baseurl, //Ignored if NULL
-                             char *filename, double *prog_date_time) {
+                             const char *filename, double *prog_date_time) {
     if (!out || !filename)
         return AVERROR(EINVAL);
 
