@@ -153,8 +153,10 @@ typedef struct VariantStream {
     CodecAttributeStatus attr_status;
     unsigned int nb_streams;
     int m3u8_created; /* status of media play-list creation */
+    char *language; /* audio lauguage name */
     char *agroup; /* audio group name */
     char *ccgroup; /* closed caption group name */
+    char *sgroup; /* subtitle group name */
     char *baseurl;
 } VariantStream;
 
@@ -432,11 +434,7 @@ static int hls_delete_old_segments(AVFormatContext *s, HLSContext *hls,
         previous_segment = segment;
         segment = previous_segment->next;
         segment_cnt++;
-        if (playlist_duration <= -previous_segment->duration) {
-            previous_segment->next = NULL;
-            break;
-        }
-        if (segment_cnt >= hls->hls_delete_threshold) {
+        if (playlist_duration <= -previous_segment->duration && segment_cnt >= hls->hls_delete_threshold) {
             previous_segment->next = NULL;
             break;
         }
@@ -494,7 +492,7 @@ static int hls_delete_old_segments(AVFormatContext *s, HLSContext *hls,
                 goto fail;
             ff_format_io_close(vs->avf, &out);
         } else if (unlink(path) < 0) {
-            av_log(hls, AV_LOG_ERROR, "failed to delete old segment %s: %s\n",
+            av_log(hls, AV_LOG_INFO, "failed to delete old segment %s: %s\n",
                                      path, strerror(errno));
         }
 
@@ -517,7 +515,7 @@ static int hls_delete_old_segments(AVFormatContext *s, HLSContext *hls,
                 }
                 ff_format_io_close(vs->avf, &out);
             } else if (unlink(sub_path) < 0) {
-                av_log(hls, AV_LOG_ERROR, "failed to delete old segment %s: %s\n",
+                av_log(hls, AV_LOG_INFO, "failed to delete old segment %s: %s\n",
                                          sub_path, strerror(errno));
             }
             av_free(sub_path);
@@ -1137,22 +1135,24 @@ static int hls_rename_temp_file(AVFormatContext *s, AVFormatContext *oc)
     return ret;
 }
 
-static int get_relative_url(const char *master_url, const char *media_url,
-                            char *rel_url, int rel_url_buf_size)
+static const char* get_relative_url(const char *master_url, const char *media_url)
 {
-    char *p = NULL;
-    int base_len = -1;
-    p = strrchr(master_url, '/') ? strrchr(master_url, '/') :\
-            strrchr(master_url, '\\');
+    const char *p = strrchr(master_url, '/');
+    size_t base_len = 0;
+
+    if (!p) p = strrchr(master_url, '\\');
+
     if (p) {
-        base_len = FFABS(p - master_url);
+        base_len = p - master_url;
         if (av_strncasecmp(master_url, media_url, base_len)) {
             av_log(NULL, AV_LOG_WARNING, "Unable to find relative url\n");
-            return AVERROR(EINVAL);
+            return NULL;
         }
+    } else {
+        return media_url;
     }
-    av_strlcpy(rel_url, &(media_url[base_len + 1]), rel_url_buf_size);
-    return 0;
+
+    return media_url + base_len + 1;
 }
 
 static int64_t get_stream_bit_rate(AVStream *stream) {
@@ -1178,8 +1178,11 @@ static int create_master_playlist(AVFormatContext *s,
     AVStream *vid_st, *aud_st;
     AVDictionary *options = NULL;
     unsigned int i, j;
-    int m3u8_name_size, ret, bandwidth;
-    char *m3u8_rel_name, *ccgroup;
+    int ret, bandwidth;
+    const char *m3u8_rel_name;
+    char *ccgroup;
+    const char *vtt_m3u8_rel_name = NULL;
+    char *sgroup = NULL;
     ClosedCaptionsStream *ccs;
 
     input_vs->m3u8_created = 1;
@@ -1224,40 +1227,22 @@ static int create_master_playlist(AVFormatContext *s,
         if (vs->has_video || vs->has_subtitle || !vs->agroup)
             continue;
 
-        m3u8_name_size = strlen(vs->m3u8_name) + 1;
-        m3u8_rel_name = av_malloc(m3u8_name_size);
+        m3u8_rel_name = get_relative_url(hls->master_m3u8_url, vs->m3u8_name);
         if (!m3u8_rel_name) {
-            ret = AVERROR(ENOMEM);
-            goto fail;
-        }
-        av_strlcpy(m3u8_rel_name, vs->m3u8_name, m3u8_name_size);
-        ret = get_relative_url(hls->master_m3u8_url, vs->m3u8_name,
-                               m3u8_rel_name, m3u8_name_size);
-        if (ret < 0) {
             av_log(s, AV_LOG_ERROR, "Unable to find relative URL\n");
             goto fail;
         }
 
         ff_hls_write_audio_rendition(hls->m3u8_out, vs->agroup, m3u8_rel_name, 0, 1);
-
-        av_freep(&m3u8_rel_name);
     }
 
     /* For variant streams with video add #EXT-X-STREAM-INF tag with attributes*/
     for (i = 0; i < hls->nb_varstreams; i++) {
         vs = &(hls->var_streams[i]);
 
-        m3u8_name_size = strlen(vs->m3u8_name) + 1;
-        m3u8_rel_name = av_malloc(m3u8_name_size);
+        m3u8_rel_name = get_relative_url(hls->master_m3u8_url, vs->m3u8_name);
         if (!m3u8_rel_name) {
-            ret = AVERROR(ENOMEM);
-            goto fail;
-        }
-        av_strlcpy(m3u8_rel_name, vs->m3u8_name, m3u8_name_size);
-        ret = get_relative_url(hls->master_m3u8_url, vs->m3u8_name,
-                               m3u8_rel_name, m3u8_name_size);
-        if (ret < 0) {
-            av_log(NULL, AV_LOG_ERROR, "Unable to find relative URL\n");
+            av_log(s, AV_LOG_ERROR, "Unable to find relative URL\n");
             goto fail;
         }
 
@@ -1316,15 +1301,24 @@ static int create_master_playlist(AVFormatContext *s,
                         vs->ccgroup);
         }
 
-        ff_hls_write_stream_info(vid_st, hls->m3u8_out, bandwidth, m3u8_rel_name,
-                aud_st ? vs->agroup : NULL, vs->codec_attr, ccgroup);
+        sgroup = NULL;
+        if (vid_st && vs->sgroup) {
+            sgroup = vs->sgroup;
+            vtt_m3u8_rel_name = get_relative_url(hls->master_m3u8_url, vs->vtt_m3u8_name);
+            if (!vtt_m3u8_rel_name) {
+                av_log(s, AV_LOG_WARNING, "Unable to find relative subtitle URL\n");
+                break;
+            }
 
-        av_freep(&m3u8_rel_name);
+            ff_hls_write_subtitle_rendition(hls->m3u8_out, sgroup, vtt_m3u8_rel_name, vs->language, i, 1);
+        }
+
+        ff_hls_write_stream_info(vid_st, hls->m3u8_out, bandwidth, m3u8_rel_name,
+                aud_st ? vs->agroup : NULL, vs->codec_attr, ccgroup, sgroup);
     }
 fail:
     if(ret >=0)
         hls->master_m3u8_created = 1;
-    av_freep(&m3u8_rel_name);
     hlsenc_io_close(s, &hls->m3u8_out, hls->master_m3u8_url);
     return ret;
 }
@@ -1339,7 +1333,6 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
     int64_t sequence = FFMAX(hls->start_sequence, vs->sequence - vs->nb_entries);
     const char *proto = avio_find_protocol_name(s->url);
     int use_temp_file = proto && !strcmp(proto, "file") && (s->flags & HLS_TEMP_FILE);
-    static unsigned warned_non_file;
     char *key_uri = NULL;
     char *iv_string = NULL;
     AVDictionary *options = NULL;
@@ -1360,9 +1353,6 @@ static int hls_window(AVFormatContext *s, int last, VariantStream *vs)
     if (hls->segment_type == SEGMENT_TYPE_FMP4) {
         hls->version = 7;
     }
-
-    if (!use_temp_file && !warned_non_file++)
-        av_log(s, AV_LOG_ERROR, "Cannot use rename on non file protocol, this may lead to races and temporary partial files\n");
 
     set_http_options(s, &options, hls);
     snprintf(temp_filename, sizeof(temp_filename), use_temp_file ? "%s.tmp" : "%s", vs->m3u8_name);
@@ -1834,7 +1824,13 @@ static int parse_variant_stream_mapstring(AVFormatContext *s)
         while (keyval = av_strtok(varstr, ",", &saveptr2)) {
             varstr = NULL;
 
-            if (av_strstart(keyval, "agroup:", &val)) {
+            if (av_strstart(keyval, "language:", &val)) {
+                av_free(vs->language);
+                vs->language = av_strdup(val);
+                if (!vs->language)
+                    return AVERROR(ENOMEM);
+                continue;
+            } else if (av_strstart(keyval, "agroup:", &val)) {
                 vs->agroup = av_strdup(val);
                 if (!vs->agroup)
                     return AVERROR(ENOMEM);
@@ -1842,6 +1838,12 @@ static int parse_variant_stream_mapstring(AVFormatContext *s)
             } else if (av_strstart(keyval, "ccgroup:", &val)) {
                 vs->ccgroup = av_strdup(val);
                 if (!vs->ccgroup)
+                    return AVERROR(ENOMEM);
+                continue;
+            } else if (av_strstart(keyval, "sgroup:", &val)) {
+                av_free(vs->sgroup);
+                vs->sgroup = av_strdup(val);
+                if (!vs->sgroup)
                     return AVERROR(ENOMEM);
                 continue;
             } else if (av_strstart(keyval, "v:", &val)) {
@@ -2437,6 +2439,7 @@ failed:
         av_freep(&vs->streams);
         av_freep(&vs->agroup);
         av_freep(&vs->ccgroup);
+        av_freep(&vs->sgroup);
         av_freep(&vs->baseurl);
     }
 
@@ -2600,7 +2603,7 @@ static int hls_init(AVFormatContext *s)
 
         if (vs->has_subtitle) {
             vs->vtt_oformat = av_guess_format("webvtt", NULL, NULL);
-            if (!vs->oformat) {
+            if (!vs->vtt_oformat) {
                 ret = AVERROR_MUXER_NOT_FOUND;
                 goto fail;
             }

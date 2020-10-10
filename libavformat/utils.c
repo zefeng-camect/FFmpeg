@@ -914,7 +914,7 @@ int ff_read_packet(AVFormatContext *s, AVPacket *pkt)
 
         /* TODO: audio: time filter; video: frame reordering (pts != dts) */
         if (s->use_wallclock_as_timestamps)
-            pkt->dts = pkt->pts = av_rescale_q(av_gettime(), AV_TIME_BASE_Q, st->time_base);
+            pkt->dts = pkt->pts = av_rescale_q(av_gettime_relative(), AV_TIME_BASE_Q, st->time_base);
 
         if (!pktl && st->request_probe <= 0)
             return ret;
