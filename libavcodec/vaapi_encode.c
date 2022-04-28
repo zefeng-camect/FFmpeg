@@ -627,6 +627,7 @@ static int vaapi_encode_output(AVCodecContext *avctx,
                                VAAPIEncodePicture *pic, AVPacket *pkt)
 {
     VAAPIEncodeContext *ctx = avctx->priv_data;
+    size_t len, off;
     VACodedBufferSegment *buf_list, *buf;
     VAStatus vas;
     int total_size = 0;
