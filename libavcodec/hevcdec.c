@@ -525,7 +525,9 @@ static int set_sps(HEVCContext *s, const HEVCSPS *sps,
     }
 
     s->ps.sps = sps;
-    s->ps.vps = (HEVCVPS*) s->ps.vps_list[s->ps.sps->vps_id]->data;
+    if (s->ps.vps_list && s->ps.vps_list[s->ps.sps->vps_id]) {
+        s->ps.vps = (HEVCVPS*) s->ps.vps_list[s->ps.sps->vps_id]->data;
+    }
 
     return 0;
 
