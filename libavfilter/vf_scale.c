@@ -724,6 +724,7 @@ static int scale_frame(AVFilterLink *link, AVFrame *in, AVFrame **frame_out)
     if (in->colorspace == AVCOL_SPC_YCGCO)
         av_log(link->dst, AV_LOG_WARNING, "Detected unsupported YCgCo colorspace.\n");
 
+    av_frame_apply_cropping(in, 0);
     frame_changed = in->width  != link->w ||
                     in->height != link->h ||
                     in->format != link->format ||
@@ -759,7 +760,7 @@ static int scale_frame(AVFilterLink *link, AVFrame *in, AVFrame **frame_out)
             scale->w && scale->h)
             goto scale;
 
-        if (scale->eval_mode == EVAL_MODE_INIT) {
+        /*if (scale->eval_mode == EVAL_MODE_INIT) {
             snprintf(buf, sizeof(buf) - 1, "%d", scale->w);
             av_opt_set(scale, "w", buf, 0);
             snprintf(buf, sizeof(buf) - 1, "%d", scale->h);
@@ -772,7 +773,7 @@ static int scale_frame(AVFilterLink *link, AVFrame *in, AVFrame **frame_out)
             ret = scale_parse_expr(ctx, NULL, &scale->h_pexpr, "height", scale->h_expr);
             if (ret < 0)
                 return ret;
-        }
+        }*/
 
         if (ctx->filter == &ff_vf_scale2ref) {
             scale->var_values[VAR_S2R_MAIN_N] = link->frame_count_out;
@@ -801,6 +802,9 @@ FF_ENABLE_DEPRECATION_WARNINGS
 
         if ((ret = config_props(outlink)) < 0)
             return ret;
+
+        link->dst->inputs[0]->w      = link->w;
+        link->dst->inputs[0]->h      = link->h;
     }
 
 scale:
