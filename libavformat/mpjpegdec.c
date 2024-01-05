@@ -286,17 +286,16 @@ static char* mpjpeg_get_boundary(AVIOContext* pb)
 }
 
 static int shrink_buffer(AVIOContext *pb) {
-    const int data_len =  pb->buf_end - pb->buf_ptr;
-    const int new_buffer_size = data_len;
+    const int data_len = pb->buf_end - pb->buf_ptr;
     uint8_t *orig_buffer = pb->buffer;
     uint8_t *new_buffer = NULL;
 
-    new_buffer = av_malloc(new_buffer_size);
+    new_buffer = av_malloc(data_len);
     if (!new_buffer) return AVERROR(ENOMEM);
     memcpy(new_buffer, pb->buf_ptr, data_len);
 
     pb->buffer = pb->buf_ptr = new_buffer;
-    pb->buffer_size = new_buffer_size;
+    pb->buffer_size = data_len;
     pb->buf_end = pb->buffer + data_len;
 
     av_free(orig_buffer);
