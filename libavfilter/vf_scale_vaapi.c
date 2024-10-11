@@ -47,6 +47,8 @@ typedef struct ScaleVAAPIContext {
     int   colour_range;
     char *chroma_location_string;
 
+    int passthrough;
+
     enum AVColorPrimaries colour_primaries;
     enum AVColorTransferCharacteristic colour_transfer;
     enum AVColorSpace colour_matrix;
@@ -85,15 +87,19 @@ static int scale_vaapi_config_output(AVFilterLink *outlink)
     ff_scale_adjust_dimensions(inlink, &vpp_ctx->output_width, &vpp_ctx->output_height,
                                ctx->force_original_aspect_ratio, ctx->force_divisible_by);
 
-    if (inlink->w == vpp_ctx->output_width && inlink->h == vpp_ctx->output_height &&
+    if (ctx->passthrough && 
+        inlink->w == vpp_ctx->output_width && inlink->h == vpp_ctx->output_height &&
         (vpp_ctx->input_frames->sw_format == vpp_ctx->output_format ||
          vpp_ctx->output_format == AV_PIX_FMT_NONE) &&
         ctx->colour_primaries == AVCOL_PRI_UNSPECIFIED &&
         ctx->colour_transfer == AVCOL_TRC_UNSPECIFIED &&
         ctx->colour_matrix == AVCOL_SPC_UNSPECIFIED &&
         ctx->colour_range == AVCOL_RANGE_UNSPECIFIED &&
-        ctx->chroma_location == AVCHROMA_LOC_UNSPECIFIED)
+        ctx->chroma_location == AVCHROMA_LOC_UNSPECIFIED) {
         vpp_ctx->passthrough = 1;
+    } else {
+        vpp_ctx->passthrough = 0;
+    }
 
     err = ff_vaapi_vpp_config_output(outlink);
     if (err < 0)
@@ -298,7 +304,7 @@ static const AVOption scale_vaapi_options[] = {
     { "decrease", NULL, 0, AV_OPT_TYPE_CONST, {.i64 = 1 }, 0, 0, FLAGS, "force_oar" },
     { "increase", NULL, 0, AV_OPT_TYPE_CONST, {.i64 = 2 }, 0, 0, FLAGS, "force_oar" },
     { "force_divisible_by", "enforce that the output resolution is divisible by a defined integer when force_original_aspect_ratio is used", OFFSET(force_divisible_by), AV_OPT_TYPE_INT, { .i64 = 1}, 1, 256, FLAGS },
-
+    { "passthrough", "Passthrough the frame args check", OFFSET(passthrough), AV_OPT_TYPE_BOOL, { .i64 = 1}, 0, 1, FLAGS },
     { NULL },
 };
 
