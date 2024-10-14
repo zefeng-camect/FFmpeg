@@ -47,7 +47,7 @@ typedef struct ScaleVAAPIContext {
     int   colour_range;
     char *chroma_location_string;
 
-    int passthrough;
+    int enable_passthrough;
 
     enum AVColorPrimaries colour_primaries;
     enum AVColorTransferCharacteristic colour_transfer;
@@ -87,7 +87,7 @@ static int scale_vaapi_config_output(AVFilterLink *outlink)
     ff_scale_adjust_dimensions(inlink, &vpp_ctx->output_width, &vpp_ctx->output_height,
                                ctx->force_original_aspect_ratio, ctx->force_divisible_by);
 
-    if (ctx->passthrough && 
+    if (ctx->enable_passthrough && 
         inlink->w == vpp_ctx->output_width && inlink->h == vpp_ctx->output_height &&
         (vpp_ctx->input_frames->sw_format == vpp_ctx->output_format ||
          vpp_ctx->output_format == AV_PIX_FMT_NONE) &&
@@ -304,7 +304,7 @@ static const AVOption scale_vaapi_options[] = {
     { "decrease", NULL, 0, AV_OPT_TYPE_CONST, {.i64 = 1 }, 0, 0, FLAGS, "force_oar" },
     { "increase", NULL, 0, AV_OPT_TYPE_CONST, {.i64 = 2 }, 0, 0, FLAGS, "force_oar" },
     { "force_divisible_by", "enforce that the output resolution is divisible by a defined integer when force_original_aspect_ratio is used", OFFSET(force_divisible_by), AV_OPT_TYPE_INT, { .i64 = 1}, 1, 256, FLAGS },
-    { "passthrough", "Passthrough the frame args check", OFFSET(passthrough), AV_OPT_TYPE_BOOL, { .i64 = 1}, 0, 1, FLAGS },
+    { "enable_passthrough", "Passthrough the frame args check", OFFSET(enable_passthrough), AV_OPT_TYPE_BOOL, { .i64 = 1}, 0, 1, FLAGS },
     { NULL },
 };
 
